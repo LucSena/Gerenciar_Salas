@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FaCalendarCheck, FaUserFriends, FaDoorOpen, FaBell } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Calendar } from "@/components/ui/calendar";
+import { Calendar, CalendarProps } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -37,12 +37,14 @@ interface DashboardData {
     activeUsers: number;
     totalRooms: number;
   };
+  reservationDates: Date[]; // Adicione esta linha
 }
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [reservationDates, setReservationDates] = useState<Date[]>([]);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState<Date | undefined>(new Date());
 
@@ -54,12 +56,25 @@ export default function DashboardPage() {
     }
   }, [status, router]);
 
+  const isDateBooked = (date: Date, rooms: Room[]): boolean => {
+    return rooms.some(room =>
+      room.reservations.some(reservation => {
+        const reservationDate = new Date(reservation.startTime);
+        return reservationDate.toDateString() === date.toDateString();
+      })
+    );
+  };
   const fetchDashboardData = async () => {
     try {
       const response = await fetch('/api/rooms');
       if (response.ok) {
         const data: DashboardData = await response.json();
         setDashboardData(data);
+        // Extrair todas as datas de reserva
+        const allReservationDates = data.rooms.flatMap(room =>
+          room.reservations.map(reservation => new Date(reservation.startTime))
+        );
+        setReservationDates(allReservationDates);
       } else {
         console.error('Erro ao buscar dados do dashboard');
       }
@@ -162,12 +177,18 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle>Calendário</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               <Calendar
                 mode="single"
                 selected={date}
                 onSelect={setDate}
                 className="rounded-md border"
+                modifiers={{
+                  booked: (date) => isDateBooked(date, rooms),
+                }}
+                modifiersStyles={{
+                  booked: { backgroundColor: 'rgba(236, 72, 153, 0.1)', color: '#ec4899', fontWeight: 'bold' }
+                }}
               />
             </CardContent>
           </Card>
