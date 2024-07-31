@@ -16,7 +16,21 @@ export async function GET(
   try {
     const room = await prisma.room.findUnique({
       where: { id: parseInt(params.id) },
-      include: { reservations: true },
+      include: { 
+        reservations: {
+          include: {
+            user: {
+              select: {
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: {
+            startTime: 'asc'
+          }
+        } 
+      },
     });
 
     if (!room) {
