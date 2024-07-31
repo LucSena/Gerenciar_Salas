@@ -228,12 +228,40 @@ export default function DashboardPage() {
                 mode="single"
                 selected={date}
                 onSelect={setDate}
-                className="rounded-md border"
+                className="rounded-md border w-full"
                 modifiers={{
                   booked: (date) => isDateBooked(date, rooms),
                 }}
                 modifiersStyles={{
                   booked: { backgroundColor: 'rgba(236, 72, 153, 0.1)', color: '#ec4899', fontWeight: 'bold' }
+                }}
+                styles={{
+                  months: { width: '100%' },
+                  month: { width: '100%' },
+                  table: { width: '100%' },
+                  head_cell: { 
+                    width: 'calc(100% / 7)',
+                    textAlign: 'center',
+                    padding: '0.5rem',
+                    fontSize: '0.875rem'
+                  },
+                  cell: { 
+                    width: 'calc(100% / 7)',
+                    height: '2.5rem',
+                    textAlign: 'center',
+                    padding: '0.25rem'
+                  },
+                  day: { 
+                    width: '100%', 
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  },
+                  nav_button: {
+                    width: '2rem',
+                    height: '2rem'
+                  }
                 }}
               />
               <div className="mt-4">
@@ -258,6 +286,21 @@ export default function DashboardPage() {
                             </p>
                           </div>
                         ))
+                    ).length > 0 ? (
+                      rooms.flatMap(room =>
+                        room.reservations
+                          .filter(res => new Date(res.startTime).toDateString() === date.toDateString())
+                          .map(res => (
+                            <div key={res.id} className="mb-2">
+                              <p className="font-medium">{room.name}</p>
+                              <p className="text-sm text-gray-600">
+                                {new Date(res.startTime).toLocaleTimeString()} - {new Date(res.endTime).toLocaleTimeString()}
+                              </p>
+                            </div>
+                          ))
+                      )
+                    ) : (
+                      <p className="text-gray-600">Não há reservas para este dia.</p>
                     )}
                   </ScrollArea>
                 </div>
