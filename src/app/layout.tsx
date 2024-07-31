@@ -2,12 +2,22 @@ import './globals.css'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import NextAuthSessionProvider from '@/components/providers/SessionProvider'
+import { Navbar } from '@/components/Navbar'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'Gerenciamento de Salas de Reunião',
   description: 'Sistema de reserva de salas de reunião',
+}
+
+function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <Navbar />
+      {children}
+    </>
+  );
 }
 
 export default function RootLayout({
@@ -19,7 +29,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <NextAuthSessionProvider>
-          {children}
+          <AuthenticatedLayout>
+            {children}
+          </AuthenticatedLayout>
         </NextAuthSessionProvider>
       </body>
     </html>

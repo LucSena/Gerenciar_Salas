@@ -29,3 +29,25 @@ export async function GET(
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const session = await getServerSession(authOptions);
+
+  if (!session) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+  }
+
+  try {
+    const room = await prisma.room.delete({
+      where: { id: parseInt(params.id) },
+    });
+
+    return NextResponse.json(room);
+  } catch (error) {
+    console.error('Erro ao deletar sala:', error);
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+  }
+}
