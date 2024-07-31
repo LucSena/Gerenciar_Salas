@@ -95,3 +95,62 @@ export async function PUT(
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
   }
 }
+
+export async function POST(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { startTime, endTime } = body;
+
+    // Verificar se já existe uma reserva para o horário solicitado
+    const existingReservation = await prisma.reservation.findFirst({
+      where: {
+        userId: parseInt(session.user.id),
+        OR: [
+          {
+            AND: [
+              { startTime: { lte: new Date(startTime) } },
+              { endTime: { gt: new Date(startTime) } },
+            ],
+          },
+          {
+            AND: [
+              { startTime: { lt: new Date(endTime) } },
+              { endTime: { gte: new Date(endTime) } },
+            ],
+          },
+        ],
+      },
+    });
+
+    if (existingReservation) {
+      return NextResponse.json({ error: 'Horário já reservado' }, { status: 409 });
+    }
+
+    const newReservation = await prisma.reservation.create({
+      data: {
+        roomId: parseInt(params.id),
+        userId: parseInt(session.user.id),
+        startTime: new Date(startTime),
+        endTime: new Date(endTime),
+      },
+      include: {
+        user: {
+          select: { name: true, email: true },
+        },
+      },
+    });
+
+    return NextResponse.json(newReservation);
+  } catch (error) {
+    console.error('Erro ao criar reserva:', error);
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+  }
+}

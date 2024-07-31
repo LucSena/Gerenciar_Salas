@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { FaUserFriends, FaCalendarAlt, FaMapMarkerAlt, FaPencilAlt } from 'react-icons/fa';
 import { format } from 'date-fns';
 import { useSession } from 'next-auth/react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'react-hot-toast';
 
 interface Room {
   id: string;
@@ -26,16 +28,24 @@ interface Reservation {
   id: number;
   startTime: string;
   endTime: string;
+  date: Date;
   user: {
     name: string;
     email: string;
   };
+}
+interface ReservationForm {
+  date: Date;
+  startTime: string;
+  endTime: string;
 }
 
 export default function RoomDetailsPage() {
   const [room, setRoom] = useState<Room | null>(null);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const { register, handleSubmit, formState: { errors } } = useForm<ReservationForm>();
+  const [isReserving, setIsReserving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -66,6 +76,41 @@ export default function RoomDetailsPage() {
     fetchRoom();
   }, [id]);
 
+  const onSubmit = async (data: ReservationForm) => {
+    setIsReserving(true);
+    try {
+      const startDateTime = new Date(`${format(data.date, 'yyyy-MM-dd')}T${data.startTime}:00`);
+      const endDateTime = new Date(`${format(data.date, 'yyyy-MM-dd')}T${data.endTime}:00`);
+
+      const response = await fetch(`/api/rooms/${id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          startTime: startDateTime.toISOString(),
+          endTime: endDateTime.toISOString(),
+        }),
+      });
+
+      if (response.ok) {
+        const newReservation = await response.json();
+        setRoom(prevRoom => ({
+          ...prevRoom!,
+          reservations: [...prevRoom!.reservations, newReservation],
+        }));
+        toast.success('Reserva criada com sucesso!');
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Erro ao criar reserva');
+      }
+    } catch (error) {
+      console.error('Erro ao criar reserva:', error);
+      toast.error('Erro ao criar reserva');
+    } finally {
+      setIsReserving(false);
+    }
+  };
   const isDateBooked = (date: Date, rooms: Room[]): boolean => {
     return rooms.some(room =>
       room.reservations.some(reservation => {
@@ -157,6 +202,46 @@ export default function RoomDetailsPage() {
               <span>Total de reservas: {room.reservations.length}</span>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Fazer Reserva</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div>
+              <Label htmlFor="date">Data</Label>
+              <Input
+                id="date"
+                type="date"
+                {...register('date', { required: 'Data é obrigatória' })}
+              />
+              {errors.date && <p className="text-red-500">{errors.date.message}</p>}
+            </div>
+            <div>
+              <Label htmlFor="startTime">Hora de Início</Label>
+              <Input
+                id="startTime"
+                type="time"
+                {...register('startTime', { required: 'Hora de início é obrigatória' })}
+              />
+              {errors.startTime && <p className="text-red-500">{errors.startTime.message}</p>}
+            </div>
+            <div>
+              <Label htmlFor="endTime">Hora de Término</Label>
+              <Input
+                id="endTime"
+                type="time"
+                {...register('endTime', { required: 'Hora de término é obrigatória' })}
+              />
+              {errors.endTime && <p className="text-red-500">{errors.endTime.message}</p>}
+            </div>
+            <Button type="submit" disabled={isReserving}>
+              {isReserving ? 'Reservando...' : 'Reservar'}
+            </Button>
+          </form>
         </CardContent>
       </Card>
 
