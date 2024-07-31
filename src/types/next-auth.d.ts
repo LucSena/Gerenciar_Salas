@@ -13,4 +13,11 @@ declare module "next-auth" {
   interface User {
     accessLevel: 'admin' | 'user';
   }
+
+  interface Room {
+    id: string;
+    name: string;
+    capacity: number;
+  }
+  
 }
