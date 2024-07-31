@@ -36,6 +36,7 @@ export default function RoomDetailsPage() {
   const [room, setRoom] = useState<Room | null>(null);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [isLoading, setIsLoading] = useState(true);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editedRoom, setEditedRoom] = useState<Partial<Room>>({});
@@ -47,11 +48,18 @@ export default function RoomDetailsPage() {
   useEffect(() => {
     const fetchRoom = async () => {
       if (id) {
-        const response = await fetch(`/api/rooms/${id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setRoom(data);
-          setEditedRoom(data);
+        setIsLoading(true);
+        try {
+          const response = await fetch(`/api/rooms/${id}`);
+          if (response.ok) {
+            const data = await response.json();
+            setRoom(data);
+            setEditedRoom(data);
+          }
+        } catch (error) {
+          console.error('Erro ao buscar detalhes da sala:', error);
+        } finally {
+          setIsLoading(false);
         }
       }
     };
@@ -77,25 +85,45 @@ export default function RoomDetailsPage() {
   };
 
   const handleEdit = async () => {
-    const response = await fetch(`/api/rooms/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(editedRoom),
-    });
-    if (response.ok) {
-      setRoom(await response.json());
-      setIsEditDialogOpen(false);
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/rooms/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(editedRoom),
+      });
+      if (response.ok) {
+        const updatedRoom = await response.json();
+        // Garantir que updatedRoom tem todas as propriedades necessárias
+        setRoom({
+          ...room, // Manter as propriedades existentes
+          ...updatedRoom, // Sobrescrever com as propriedades atualizadas
+          reservations: room?.reservations || [] // Manter as reservas existentes se não forem atualizadas
+        });
+        setIsEditDialogOpen(false);
+      } else {
+        // Tratar erro de resposta não-OK
+        console.error('Erro ao atualizar sala:', await response.text());
+      }
+    } catch (error) {
+      console.error('Erro ao editar sala:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (!room) return <div className="flex items-center justify-center h-screen">Carregando...</div>;
+  if (isLoading) return <div className="flex items-center justify-center h-screen">Carregando...</div>;
 
-  const filteredReservations = room.reservations.filter(reservation => 
-    new Date(reservation.startTime).toDateString() === selectedDate?.toDateString()
-  );
-
+  if (!room) return <div className="flex items-center justify-center h-screen">Sala não encontrada</div>;
+  
+  const filteredReservations = room && room.reservations
+    ? room.reservations.filter(reservation => 
+        new Date(reservation.startTime).toDateString() === date?.toDateString()
+      )
+    : [];
+  
   const isAdmin = session?.user?.accessLevel === 'admin';
 
   return (
