@@ -3,15 +3,16 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FaCalendarCheck, FaUserFriends, FaDoorOpen, FaBell } from 'react-icons/fa';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Calendar, CalendarProps } from "@/components/ui/calendar";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { FaCalendarAlt, FaChartBar, FaChartPie, FaCalendarCheck, FaUserFriends, FaDoorOpen, FaBell } from 'react-icons/fa';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 
 interface Room {
   id: number;
@@ -47,6 +48,7 @@ export default function DashboardPage() {
   const [reservationDates, setReservationDates] = useState<Date[]>([]);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const [activeTab, setActiveTab] = useState('bar');
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -111,6 +113,15 @@ export default function DashboardPage() {
     }))
   ).sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 5);
 
+
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+
+  const pieChartData = rooms.map((room, index) => ({
+    name: room.name,
+    value: room.reservations.length,
+    color: COLORS[index % COLORS.length]
+  }));
+
   return (
     <div className="min-h-screen bg-gray-100">
       <main className="container mx-auto p-4">
@@ -155,29 +166,64 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
           <Card className="col-span-1 lg:col-span-2">
             <CardHeader>
-              <CardTitle>Visão Geral de Reservas por Sala</CardTitle>
+              <CardTitle className="flex items-center">
+                <FaChartBar className="mr-2" />
+                Visão Geral de Reservas por Sala
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="reservas" fill="#8884d8" />
-                </BarChart>
-              </ResponsiveContainer>
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="mb-4">
+                  <TabsTrigger value="bar">Gráfico de Barras</TabsTrigger>
+                  <TabsTrigger value="pie">Gráfico de Pizza</TabsTrigger>
+                </TabsList>
+                <TabsContent value="bar">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="reservas" fill="#8884d8" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </TabsContent>
+                <TabsContent value="pie">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={pieChartData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {pieChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="col-span-1 row-span-2">
             <CardHeader>
-              <CardTitle>Calendário</CardTitle>
+              <CardTitle className="flex items-center">
+                <FaCalendarAlt className="mr-2" />
+                Calendário de Reservas
+              </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
+            <CardContent>
               <Calendar
                 mode="single"
                 selected={date}
@@ -190,23 +236,49 @@ export default function DashboardPage() {
                   booked: { backgroundColor: 'rgba(236, 72, 153, 0.1)', color: '#ec4899', fontWeight: 'bold' }
                 }}
               />
+              <div className="mt-4">
+                <h3 className="font-semibold mb-2">Legenda:</h3>
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-pink-100 mr-2"></div>
+                  <span>Dia com reservas</span>
+                </div>
+              </div>
+              {date && (
+                <div className="mt-4">
+                  <h3 className="font-semibold mb-2">Reservas para {date.toLocaleDateString()}:</h3>
+                  <ScrollArea className="h-40">
+                    {rooms.flatMap(room =>
+                      room.reservations
+                        .filter(res => new Date(res.startTime).toDateString() === date.toDateString())
+                        .map(res => (
+                          <div key={res.id} className="mb-2">
+                            <p className="font-medium">{room.name}</p>
+                            <p className="text-sm text-gray-600">
+                              {new Date(res.startTime).toLocaleTimeString()} - {new Date(res.endTime).toLocaleTimeString()}
+                            </p>
+                          </div>
+                        ))
+                    )}
+                  </ScrollArea>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="col-span-1 lg:col-span-2">
             <CardHeader>
               <CardTitle>Notificações Recentes</CardTitle>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px]">
                 {notifications.map((notification) => (
-                  <div key={notification.id} className="flex items-center mb-4">
-                    <Avatar className="h-9 w-9">
-                      <AvatarFallback>IN</AvatarFallback>
+                  <div key={notification.id} className="flex items-center mb-4 p-2 hover:bg-gray-100 rounded-md transition-colors">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback>{notification.message.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div className="ml-4 space-y-1">
                       <p className="text-sm font-medium leading-none">{notification.message}</p>
-                      <p className="text-sm text-muted-foreground">{notification.time}</p>
+                      <p className="text-xs text-muted-foreground">{notification.time}</p>
                     </div>
                   </div>
                 ))}
