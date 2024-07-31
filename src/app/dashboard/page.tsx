@@ -81,6 +81,7 @@ export default function DashboardPage() {
   const { rooms, stats } = dashboardData;
 
   // Prepare chart data
+
   const chartData = rooms.map(room => ({
     name: room.name,
     reservas: room.reservations.length

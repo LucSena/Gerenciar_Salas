@@ -14,8 +14,12 @@ export async function GET(request: Request) {
     const rooms = await prisma.room.findMany({
       include: {
         reservations: {
-          include: {
-            user: {
+          // Optimized to fetch only the essential reservation details
+          select: {
+            id: true,
+            startTime: true,
+            endTime: true,
+            user: { // If you still need user info, include this line
               select: {
                 name: true,
                 email: true
@@ -34,7 +38,7 @@ export async function GET(request: Request) {
       }
     });
 
-    // Calcular estatísticas
+    // Efficiently calculate stats (if needed)
     const totalReservations = rooms.reduce((sum, room) => sum + room.reservations.length, 0);
     const activeUsers = await prisma.user.count({
       where: {
@@ -56,6 +60,7 @@ export async function GET(request: Request) {
         totalRooms: rooms.length
       }
     });
+
   } catch (error) {
     console.error('Erro ao buscar salas:', error);
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
