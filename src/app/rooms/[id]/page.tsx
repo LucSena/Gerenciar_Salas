@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { format } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,12 +12,11 @@ import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast"
 import { FaUserFriends, FaCalendarAlt, FaMapMarkerAlt, FaPencilAlt } from 'react-icons/fa';
-import { format } from 'date-fns';
 import { useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
-
 interface Room {
   id: string;
   name: string;
@@ -43,7 +44,7 @@ interface ReservationForm {
 export default function RoomDetailsPage() {
   const [room, setRoom] = useState<Room | null>(null);
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const { toast } = useToast()
   const { register, handleSubmit, formState: { errors } } = useForm<ReservationForm>();
   const [isReserving, setIsReserving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,42 +76,85 @@ export default function RoomDetailsPage() {
     };
     fetchRoom();
   }, [id]);
+  
+
 
   const onSubmit = async (data: ReservationForm) => {
     setIsReserving(true);
     try {
-      const startDateTime = new Date(`${format(data.date, 'yyyy-MM-dd')}T${data.startTime}:00`);
-      const endDateTime = new Date(`${format(data.date, 'yyyy-MM-dd')}T${data.endTime}:00`);
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      const startDateTime = new Date(`${data.date}T${data.startTime}:00`);
+      const endDateTime = new Date(`${data.date}T${data.endTime}:00`);
+
+      const requestBody = {
+        startTime: startDateTime.toISOString(),
+        endTime: endDateTime.toISOString(),
+      };
+
+      console.log('Sending reservation request:', requestBody);
 
       const response = await fetch(`/api/rooms/${id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          startTime: startDateTime.toISOString(),
-          endTime: endDateTime.toISOString(),
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      const responseData = await response.json();
+
       if (response.ok) {
-        const newReservation = await response.json();
+        const localStartTime = toZonedTime(new Date(responseData.startTime), timeZone);
+        const localEndTime = toZonedTime(new Date(responseData.endTime), timeZone);
+
         setRoom(prevRoom => ({
           ...prevRoom!,
-          reservations: [...prevRoom!.reservations, newReservation],
+          reservations: [...prevRoom!.reservations, {
+            ...responseData,
+            startTime: localStartTime.toISOString(),
+            endTime: localEndTime.toISOString(),
+          }],
         }));
-        toast.success('Reserva criada com sucesso!');
+        toast({
+          title: "Sucesso",
+          description: "Reserva criada com sucesso!",
+          variant: "default",
+        })
       } else {
-        const error = await response.json();
-        toast.error(error.error || 'Erro ao criar reserva');
+        console.error('Erro na resposta da API:', responseData);
+        if (response.status === 409) {
+          toast({
+            title: "Erro",
+            description: "Horário já reservado. Por favor, escolha outro horário.",
+            variant: "destructive",
+          })
+        } else if (response.status === 401) {
+          toast({
+            title: "Erro",
+            description: "Não autorizado. Por favor, faça login novamente.",
+            variant: "destructive",
+          })
+        } else {
+          toast({
+            title: "Erro",
+            description: responseData.error || "Erro ao criar reserva. Por favor, tente novamente.",
+            variant: "destructive",
+          })
+        }
       }
     } catch (error) {
       console.error('Erro ao criar reserva:', error);
-      toast.error('Erro ao criar reserva');
+      toast({
+        title: "Erro",
+        description: "Erro ao criar reserva. Por favor, tente novamente mais tarde.",
+        variant: "destructive",
+      })
     } finally {
       setIsReserving(false);
     }
   };
+  
   const isDateBooked = (date: Date, rooms: Room[]): boolean => {
     return rooms.some(room =>
       room.reservations.some(reservation => {

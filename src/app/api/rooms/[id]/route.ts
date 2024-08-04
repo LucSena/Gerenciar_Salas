@@ -101,7 +101,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const session = await getServerSession(authOptions);
-  if (!session) {
+  if (!session || !session.user?.id) {
+    console.log('Session not found or user ID missing:', session);
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
@@ -109,21 +110,26 @@ export async function POST(
     const body = await request.json();
     const { startTime, endTime } = body;
 
+    console.log('Received data:', { startTime, endTime, roomId: params.id, userId: session.user.id });
+
+    const startDateTime = new Date(startTime);
+    const endDateTime = new Date(endTime);
+
     // Verificar se já existe uma reserva para o horário solicitado
     const existingReservation = await prisma.reservation.findFirst({
       where: {
-        userId: parseInt(session.user.id),
+        roomId: parseInt(params.id),
         OR: [
           {
             AND: [
-              { startTime: { lte: new Date(startTime) } },
-              { endTime: { gt: new Date(startTime) } },
+              { startTime: { lte: startDateTime } },
+              { endTime: { gt: startDateTime } },
             ],
           },
           {
             AND: [
-              { startTime: { lt: new Date(endTime) } },
-              { endTime: { gte: new Date(endTime) } },
+              { startTime: { lt: endDateTime } },
+              { endTime: { gte: endDateTime } },
             ],
           },
         ],
@@ -138,8 +144,8 @@ export async function POST(
       data: {
         roomId: parseInt(params.id),
         userId: parseInt(session.user.id),
-        startTime: new Date(startTime),
-        endTime: new Date(endTime),
+        startTime: startDateTime,
+        endTime: endDateTime,
       },
       include: {
         user: {
@@ -148,9 +154,12 @@ export async function POST(
       },
     });
 
+    console.log('New reservation created:', newReservation);
+
     return NextResponse.json(newReservation);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Erro ao criar reserva:', error);
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    return NextResponse.json({ error: 'Erro interno do servidor', details: errorMessage }, { status: 500 });
   }
 }

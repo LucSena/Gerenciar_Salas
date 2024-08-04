@@ -38,7 +38,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         return {
-          id: user.id + '',
+          id: user.id.toString(),
           email: user.email,
           name: user.name,
           accessLevel: user.accessLevel,
@@ -56,12 +56,14 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        token.id = user.id;
         token.accessLevel = user.accessLevel;
       }
       return token;
     },
     async session({ session, token }) {
       if (session?.user) {
+        session.user.id = token.id as string;
         session.user.accessLevel = token.accessLevel as 'admin' | 'user';
       }
       return session;
