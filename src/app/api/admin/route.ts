@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       data: {
         name,
         email,
-        password, // Note: In a real application, you should hash the password before storing it
+        password, 
         accessLevel,
       },
     });

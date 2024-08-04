@@ -54,10 +54,15 @@ export const authOptions: NextAuthOptions = {
     signIn: '/login',
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.accessLevel = user.accessLevel;
+      }
+      // Se a sessão foi atualizada, atualize o token
+      if (trigger === "update" && session) {
+        token.name = session.user.name;
+        token.email = session.user.email;
       }
       return token;
     },
@@ -65,6 +70,8 @@ export const authOptions: NextAuthOptions = {
       if (session?.user) {
         session.user.id = token.id as string;
         session.user.accessLevel = token.accessLevel as 'admin' | 'user';
+        session.user.name = token.name as string;
+        session.user.email = token.email as string;
       }
       return session;
     },
