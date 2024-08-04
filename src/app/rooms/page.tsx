@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FaSearch, FaPlus, FaEye, FaUserFriends, FaMapMarkerAlt } from 'react-icons/fa';
 
 interface Room {
@@ -22,9 +22,11 @@ interface Room {
 }
 
 export default function RoomsPage() {
-  const [rooms, setRooms] = useState<Room[]>([]); 
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [capacityFilter, setCapacityFilter] = useState('all');
+  const [locationFilter, setLocationFilter] = useState('all');
   const router = useRouter();
 
   useEffect(() => {
@@ -32,11 +34,9 @@ export default function RoomsPage() {
       const response = await fetch('/api/rooms');
       if (response.ok) {
         const data = await response.json();
-
-        // Ensure the data has the "rooms" property and is an array
-        const roomsData = Array.isArray(data.rooms) ? data.rooms : [];  
+        const roomsData = Array.isArray(data.rooms) ? data.rooms : [];
         setRooms(roomsData);
-        setFilteredRooms(roomsData); // Initialize filtered rooms with all rooms initially
+        setFilteredRooms(roomsData);
       }
     };
     fetchRooms();
@@ -44,18 +44,20 @@ export default function RoomsPage() {
 
   useEffect(() => {
     const results = rooms.filter(room =>
-      room.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      room.location.toLowerCase().includes(searchTerm.toLowerCase())
+      (room.name?.toLowerCase().includes(searchTerm.toLowerCase()) || room.location?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      (capacityFilter === 'all' || room.capacity >= parseInt(capacityFilter)) &&
+      (locationFilter === 'all' || room.location === locationFilter)
     );
     setFilteredRooms(results);
-  }, [searchTerm, rooms]);
-
+  }, [searchTerm, capacityFilter, locationFilter, rooms]);
 
   const getNextReservation = (room: Room) => {
     const now = new Date();
     const futureReservations = room.reservations.filter(res => new Date(res.startTime) > now);
     return futureReservations.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())[0];
   };
+
+  const uniqueLocations = Array.from(new Set(rooms.map(room => room.location)));
 
   return (
     <div className="container mx-auto p-4">
@@ -65,8 +67,8 @@ export default function RoomsPage() {
           <CardDescription>Visualize e gerencie todas as salas disponíveis</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex justify-between items-center mb-4">
-            <div className="relative w-64">
+          <div className="flex flex-wrap gap-4 mb-4">
+            <div className="relative flex-grow">
               <Input
                 type="text"
                 placeholder="Buscar salas..."
@@ -76,6 +78,30 @@ export default function RoomsPage() {
               />
               <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             </div>
+            <Select value={capacityFilter} onValueChange={setCapacityFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Capacidade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="10">10+ pessoas</SelectItem>
+                <SelectItem value="20">20+ pessoas</SelectItem>
+                <SelectItem value="50">50+ pessoas</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Localização" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {uniqueLocations.map((location) => (
+                  <SelectItem key={location} value={location}>
+                    {location}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button onClick={() => router.push('/rooms/create')}>
               <FaPlus className="mr-2" /> Criar Nova Sala
             </Button>

@@ -7,40 +7,66 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useToast } from "@/components/ui/use-toast";
 
-interface RoomFormData {
-  name: string;
-  capacity: number;
-}
+const formSchema = z.object({
+  name: z.string().min(2, {
+    message: "O nome da sala deve ter pelo menos 2 caracteres.",
+  }),
+  capacity: z.number().min(1, {
+    message: "A capacidade deve ser de pelo menos 1 pessoa.",
+  }),
+  location: z.string().min(2, {
+    message: "A localização deve ter pelo menos 2 caracteres.",
+  }),
+});
 
 export default function CreateRoomPage() {
   const router = useRouter();
-  const form = useForm<RoomFormData>();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      capacity: 1,
+      location: "",
+    },
+  });
 
-  const onSubmit = async (data: RoomFormData) => {
-    setIsSubmitting(true);
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       const response = await fetch('/api/rooms/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(values),
       });
 
       if (response.ok) {
+        toast({
+          title: "Sucesso",
+          description: "Sala criada com sucesso!",
+          variant: "default",
+        });
         router.push('/rooms');
       } else {
-        // Tratar erro
-        console.error('Erro ao criar sala');
-        // Você pode adicionar uma notificação de erro aqui
+        const errorData = await response.json();
+        toast({
+          title: "Erro",
+          description: errorData.error || "Erro ao criar sala",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Erro ao criar sala:', error);
-      // Você pode adicionar uma notificação de erro aqui
-    } finally {
-      setIsSubmitting(false);
+      toast({
+        title: "Erro",
+        description: "Erro ao criar sala. Por favor, tente novamente.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -77,7 +103,12 @@ export default function CreateRoomPage() {
                   <FormItem>
                     <FormLabel>Capacidade</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="Digite a capacidade da sala" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10))} />
+                      <Input 
+                        type="number" 
+                        placeholder="Digite a capacidade da sala" 
+                        {...field} 
+                        onChange={(e) => field.onChange(parseInt(e.target.value, 10))} 
+                      />
                     </FormControl>
                     <FormDescription>
                       Número máximo de pessoas que a sala pode acomodar.
@@ -86,8 +117,24 @@ export default function CreateRoomPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Criando...' : 'Criar Sala'}
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Localização</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Digite a localização da sala" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Informe onde a sala está localizada.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Criando...' : 'Criar Sala'}
               </Button>
             </form>
           </Form>
