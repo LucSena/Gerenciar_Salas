@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 
 export default function ProfilePage() {
-    const { data: session, update } = useSession();
+    const { data: session, status, update } = useSession();
     const [isEditing, setIsEditing] = useState(false);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
